@@ -57,6 +57,11 @@
            padding:10px 14px; display:none; max-width:420px; }
   #toast.err { border-color:var(--red); }
   input[type=file] { display:none; }
+  .vars { display:grid; grid-template-columns:max-content 1fr; gap:8px 12px; align-items:center; }
+  .vars code { color:var(--orange); font-size:15px; }
+  .vars input { background:#0a2242; color:var(--text); border:1px solid var(--line); border-radius:9px; padding:8px 10px; font:inherit; font-size:14px; width:100%; }
+  .vars input.missing { border-color:var(--red); box-shadow:0 0 0 2px rgba(255,107,91,.25); }
+  .vars .hint { grid-column:2; margin-top:-4px; }
 </style>
 </head>
 <body>
@@ -118,6 +123,13 @@
   </section>
 
   <section class="card wide">
+    <h2>Topic variables</h2>
+    <div id="varsBox" class="muted">…</div>
+    <div class="row" id="varsBtns" style="display:none"><button class="pri" id="bVars">Apply</button></div>
+    <div class="note">Placeholders such as <code>{portal}</code> in the profile's topics are filled in here, saved separately for each profile. <code>{portal}</code> is your Victron portal ID (VRM → Settings → General); it starts with the value from the container settings.</div>
+  </section>
+
+  <section class="card wide">
     <h2>Live values</h2>
     <input id="filter" placeholder="Filter topics…">
     <div class="scroll"><table><thead><tr><th>Topic</th><th>Last value</th><th>Age</th></tr></thead><tbody id="vals"></tbody></table></div>
@@ -146,6 +158,7 @@ function toast(msg, err) {
 async function act(path, body, okMsg) {
   try { await api(path, body); if (okMsg) toast(okMsg); } catch (e) { toast(e.message, true); }
   await refresh(true);
+  refreshVars(path === '/api/select' || path === '/api/upload' || path === '/api/delete');
 }
 
 function fillSelect(sel, list, cur, allowNone) {
@@ -176,7 +189,7 @@ async function refresh(full) {
   $('runInfo').textContent = s.running ? `${s.topics} topics · ${s.sel.profile ? s.sel.profile.name : ''} · up ${hms}` : '';
   $('mqDot').className = 'dot ' + (s.connected ? 'on' : (s.running ? 'err' : ''));
   $('mqTxt').textContent = (s.dry_run ? 'Dry run (not publishing)' : `Broker ${s.broker}` + (s.user ? ` as ${s.user}` : '')) + (s.connected ? ' · connected' : (s.running ? ' · not connected' : ''));
-  $('errTxt').textContent = s.error || '';
+  $('errTxt').textContent = s.error || (s.running && s.skipped ? `${s.skipped} topics not published: fill in the Topic variables below` : '');
   $('bStart').disabled = s.running; $('bStop').disabled = !s.running;
   fillSelect($('selProfile'), files.profiles, s.sel.profile, false);
   fillSelect($('selRoute'), files.routes, s.sel.route, true);
@@ -189,6 +202,36 @@ async function refresh(full) {
       `<a style="color:var(--light)" target="_blank" href="https://www.openstreetmap.org/?mlat=${g.lat}&mlon=${g.lon}#map=13/${g.lat}/${g.lon}">${g.lat.toFixed(4)}, ${g.lon.toFixed(4)}</a>` +
       (s.route_info ? `<br>${s.route_info}` : '') : 'No route running.';
 }
+
+let varsKey = null;
+async function refreshVars(force) {
+  let v;
+  try { v = await api('/api/vars'); } catch (e) { return; }
+  const key = v.profile ? v.profile.src + '|' + v.profile.name : '';
+  if (!force && key === varsKey) {   // same profile: only update the red "missing" marks
+    v.vars.forEach(x => { const i = document.querySelector(`[data-var="${x.name}"]`); if (i && !i.value) i.classList.add('missing'); });
+    return;
+  }
+  varsKey = key;
+  if (!v.vars.length) {
+    $('varsBox').className = 'muted';
+    $('varsBox').innerHTML = v.profile ? 'This profile has no <code>{placeholders}</code>.' : 'Choose a profile first.';
+    $('varsBtns').style.display = 'none';
+    return;
+  }
+  $('varsBox').className = 'vars';
+  $('varsBox').innerHTML = v.vars.map(x => `<code>{${esc(x.name)}}</code>
+    <input data-var="${esc(x.name)}" value="${esc(x.value)}" placeholder="${x.name === 'portal' ? 'e.g. the 12-character VRM portal ID' : 'value'}" class="${x.value ? '' : 'missing'}">
+    ${x.name === 'portal' && x.default ? `<div class="hint muted">Container setting: ${esc(x.default)}${x.saved ? ' (overridden here)' : ''}</div>` : ''}`).join('');
+  $('varsBox').querySelectorAll('input').forEach(i => i.addEventListener('input', () => i.classList.toggle('missing', !i.value.trim())));
+  $('varsBtns').style.display = '';
+}
+$('bVars').onclick = async () => {
+  const values = {};
+  document.querySelectorAll('[data-var]').forEach(i => values[i.dataset.var] = i.value.trim());
+  await act('/api/vars', { values }, 'Topic variables saved' + (status && status.running ? ' and restarted' : ''));
+  refreshVars(true);
+};
 
 async function refreshValues() {
   try {
@@ -236,7 +279,7 @@ $('bRestart').onclick = () => act('/api/restart', {}, 'Restarted');
 $('bOpts').onclick = () => act('/api/options', { speedup: parseFloat($('speedup').value) || 1, loop: $('loop').checked }, 'Route options applied');
 $('filter').addEventListener('input', refreshValues);
 
-refresh(true); refreshValues(); refreshLog();
+refresh(true); refreshValues(); refreshLog(); refreshVars(true);
 setInterval(refresh, 2000); setInterval(() => refresh(true), 15000);
 setInterval(refreshValues, 2000); setInterval(refreshLog, 3000);
 </script>

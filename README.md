@@ -15,6 +15,7 @@ Open `http://<unraid-ip>:8099` (on Unraid: Docker → mqtt-sim icon → **WebUI*
 - **Status**: running or stopped, broker connection, **Start / Stop / Restart**. Stopping removes the retained test values from the broker.
 - **Profile** and **GPS route**: choose from **My files** (your uploads) or **Examples** (built in). **Use a CSV from this PC…** uploads a file into the data folder and switches to it straight away. **Download** gets the current file (start from an example, edit it in Excel, upload it back). **Delete** removes one of your own files.
 - **Speed-up** and **Repeat route** for the GPS drive.
+- **Topic variables**: every `{placeholder}` the profile uses (e.g. `{portal}` for the Victron portal ID), each with a box. Values are saved per profile. Topics whose placeholders are still empty are not published, and the page says so.
 - **Live values**: every topic with its last value and age, with a filter box.
 - **Log**: the last few hundred log lines.
 
@@ -93,7 +94,7 @@ The repository and the `mqtt-sim` package on GitHub must both be **public** so U
 | `WEB_PASSWORD` | | Optional password for the web page |
 | `SPEEDUP` | 1 | Route time multiplier (10 = ten times faster) |
 | `ROUTE_LOOP` | no | Start the route again when it ends |
-| `PORTAL` | 000000000000 | Your Victron portal ID (VRM → Settings → General); replaces `{portal}` in topics |
+| `PORTAL` | | Starting value for `{portal}` (Victron portal ID, VRM → Settings → General); can be changed on the web page |
 | `DEFAULT_EVERY` | 5 | Seconds between publishes when a row leaves `every_s` blank |
 | `CLEAR_ON_EXIT` | yes | When stopped, remove the retained test values from the broker |
 | `DURATION` | 0 | Stop after N seconds (0 = keep running) |
@@ -108,7 +109,7 @@ Edit in Excel. Header row required; extra columns are ignored. Rows with `enable
 | Column | Values |
 |---|---|
 | `enabled` | yes / no |
-| `topic` | e.g. `victron/info/battery_soc`, `N/{portal}/system/0/Dc/Battery/Soc` |
+| `topic` | e.g. `victron/info/battery_soc`, `N/{portal}/system/0/Dc/Battery/Soc`. Any `{name}` is a placeholder filled in under **Topic variables** on the web page |
 | `format` | `number`, `bool` (true/false), `text`, `victron` (`{"value": 87.5}`, the Cerbo's N/ format), `json` (raw) |
 | `mode` | `constant`, `random`, `drift`, `sine`, `list`, `route` |
 | `value` | constant: the value. drift: starting value. list: values separated by `\|`. route: `lat`, `lon`, `speed_ms`, `speed_kmh`, `fix`, `course`, `altitude` or `coords` (`lat,lon` text) |

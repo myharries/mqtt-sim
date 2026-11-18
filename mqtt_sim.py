@@ -10,7 +10,8 @@ command line. Run `python mqtt_sim.py --help` for the list.
 
 Profile columns (header row required, extra columns are ignored):
   enabled   yes/no            skip the row when "no"
-  topic     text              {portal} is replaced with the PORTAL setting
+  topic     text              {name} placeholders are filled in from the web page's Topic
+                              variables ({portal} defaults to the PORTAL setting)
   format    number | bool | text | victron | json
                               victron = {"value": <v>} like the Cerbo's N/ topics
   mode      constant | random | drift | sine | list | route
@@ -31,6 +32,7 @@ import json
 import math
 import os
 import random
+import re
 import signal
 import sys
 import threading
@@ -41,7 +43,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib
 import paho.mqtt.client as mqtt  # noqa: E402  (vendored in ./lib)
 
 EARTH_R = 6371000.0
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("DATA_DIR") or "/data"
 
@@ -181,11 +183,11 @@ class Route:
 
 # ------------------------------------------------------------- topic rows
 class Row:
-    def __init__(self, d, portal, default_every):
-        self.topic = d["topic"].strip().replace("{portal}", portal)
+    def __init__(self, d, variables, default_every):
+        self.topic = fill(d["topic"].strip(), variables)
         self.format = (d.get("format") or "number").strip().lower()
         self.mode = (d.get("mode") or "constant").strip().lower()
-        self.value = (d.get("value") or "").strip()
+        self.value = fill((d.get("value") or "").strip(), variables)
         self.min = fnum(d.get("min"), 0.0)
         self.max = fnum(d.get("max"), self.min if fnum(d.get("min")) is not None else 100.0)
         self.step = fnum(d.get("step"), (self.max - self.min) / 20 or 1)
@@ -244,7 +246,29 @@ class Row:
         return str(n if n is not None else v)
 
 
-def load_profile(path, portal, default_every):
+PLACEHOLDER = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def fill(text, variables):
+    """Replace {name} with its value; names without a value are left as they are."""
+    return PLACEHOLDER.sub(lambda m: str(variables.get(m.group(1)) or m.group(0)), text)
+
+
+def placeholders(path):
+    """{name} placeholders used in a profile's topic and value columns, in order of first use."""
+    seen = []
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        for d in csv.DictReader(f):
+            if not truthy(d.get("enabled"), True):
+                continue
+            for col in ("topic", "value"):
+                for name in PLACEHOLDER.findall(d.get(col) or ""):
+                    if name not in seen:
+                        seen.append(name)
+    return seen
+
+
+def load_profile(path, variables, default_every):
     rows = []
     with open(path, newline="", encoding="utf-8-sig") as f:
         for d in csv.DictReader(f):
@@ -252,7 +276,7 @@ def load_profile(path, portal, default_every):
                 continue
             if not truthy(d.get("enabled"), True):
                 continue
-            rows.append(Row(d, portal, default_every))
+            rows.append(Row(d, variables, default_every))
     return rows
 
 
@@ -266,12 +290,12 @@ def log(msg):
     print(f"[mqtt-sim] {msg}", flush=True)
 
 
-def load_profile_checked(path, portal, default_every):
+def load_profile_checked(path, variables, default_every):
     with open(path, newline="", encoding="utf-8-sig") as f:
         head = next(csv.reader(f), [])
     if "topic" not in [h.strip().lower() for h in head]:
         raise ValueError(f"{os.path.basename(path)} is not a profile: it needs a 'topic' column")
-    return load_profile(path, portal, default_every)
+    return load_profile(path, variables, default_every)
 
 
 # ------------------------------------------------------------- files
@@ -328,6 +352,8 @@ class Sim:
         self.sel = {"profile": None, "route": None}   # {"src": "data"|"example", "name": ...}
         self.speedup = a.speedup
         self.loop = a.loop
+        self.vars = {}            # "src|name" of a profile -> {placeholder: value}
+        self.skipped = 0
         self.load_state()
 
     # ---- selection, remembered in <data>/mqtt-sim.json
@@ -341,6 +367,7 @@ class Sim:
             self.sel = st.get("sel", self.sel)
             self.speedup = float(st.get("speedup", self.speedup))
             self.loop = bool(st.get("loop", self.loop))
+            self.vars = st.get("vars", {}) or {}
             self.autostart = bool(st.get("running", True))
             return
         except (OSError, ValueError):
@@ -357,10 +384,33 @@ class Sim:
         try:
             if os.path.isdir(DATA_DIR) and os.access(DATA_DIR, os.W_OK):
                 with open(self.state_file(), "w") as f:
-                    json.dump({"sel": self.sel, "speedup": self.speedup, "loop": self.loop,
+                    json.dump({"sel": self.sel, "speedup": self.speedup, "loop": self.loop, "vars": self.vars,
                                "running": self.running()}, f, indent=1)
         except OSError as e:
             log(f"could not save settings: {e}")
+
+    def profile_key(self):
+        s = self.sel.get("profile")
+        return f"{s['src']}|{s['name']}" if s else ""
+
+    def variables(self):
+        """Values for the current profile: what was saved on the web page, else the container
+        setting (PORTAL for {portal})."""
+        v = {}
+        if self.a.portal:
+            v["portal"] = self.a.portal
+        v.update({k: val for k, val in self.vars.get(self.profile_key(), {}).items() if val})
+        return v
+
+    def vars_info(self):
+        p = self.sel_path("profile")
+        names = placeholders(p) if p and os.path.isfile(p) else []
+        saved = self.vars.get(self.profile_key(), {})
+        cur = self.variables()
+        return {"profile": self.sel.get("profile"),
+                "vars": [{"name": n, "value": cur.get(n, ""), "saved": n in saved,
+                          "default": self.a.portal if n == "portal" else ""} for n in names],
+                "missing": [n for n in names if not cur.get(n)]}
 
     def sel_path(self, key):
         s = self.sel.get(key)
@@ -429,7 +479,13 @@ class Sim:
                 ppath = self.sel_path("profile")
                 if not ppath or not os.path.isfile(ppath):
                     raise ValueError("choose a profile first")
-                rows = load_profile_checked(ppath, self.a.portal, self.a.every)
+                rows = load_profile_checked(ppath, self.variables(), self.a.every)
+                unfilled = [r for r in rows if PLACEHOLDER.search(r.topic)]
+                if unfilled:
+                    names = sorted({n for r in unfilled for n in PLACEHOLDER.findall(r.topic)})
+                    log(f"{len(unfilled)} topics skipped: fill in {', '.join('{' + n + '}' for n in names)} under Topic variables")
+                    rows = [r for r in rows if not PLACEHOLDER.search(r.topic)]
+                self.skipped = len(unfilled)
                 route = None
                 rpath = self.sel_path("route")
                 if rpath and any(r.mode == "route" for r in rows):
@@ -510,7 +566,7 @@ class Sim:
             "version": VERSION, "running": self.running(), "connected": self.connected or self.a.dry_run,
             "broker": f"{self.a.host}:{self.a.port}", "user": self.a.user or "", "dry_run": self.a.dry_run,
             "sel": self.sel, "speedup": self.speedup, "loop": self.loop, "error": self.error,
-            "topics": len(self.rows), "uptime": int(time.time() - self.started) if self.started else 0,
+            "topics": len(self.rows), "skipped": self.skipped, "uptime": int(time.time() - self.started) if self.started else 0,
             "gps": {k: rs[k] for k in ("phase", "name", "lat", "lon", "speed_kmh")} if rs else None,
             "route_info": self.route.describe() if self.route else "",
         }
@@ -574,6 +630,8 @@ def start_web(sim, port, password):
                 return self.send(200, {"now": time.time(), "values": sim.values})
             if u.path == "/api/log":
                 return self.send(200, {"lines": list(LOG)})
+            if u.path == "/api/vars":
+                return self.send(200, sim.vars_info())
             if u.path == "/api/files":
                 return self.send(200, {k: list_files(k) for k in KINDS})
             if u.path == "/api/file":
@@ -631,6 +689,26 @@ def start_web(sim, port, password):
                     sim.loop = bool(b["loop"])
                 sim.save_state()
                 sim.restart()
+            elif path == "/api/vars":
+                vals = b.get("values") or {}
+                if not isinstance(vals, dict):
+                    raise ValueError("bad values")
+                key = sim.profile_key()
+                if not key:
+                    raise ValueError("choose a profile first")
+                clean = {}
+                for k, v in vals.items():
+                    if not PLACEHOLDER.fullmatch("{" + str(k) + "}"):
+                        raise ValueError(f"bad variable name {k}")
+                    v = str(v).strip()
+                    if any(ch in v for ch in "+#") or len(v) > 200:
+                        raise ValueError(f"{{{k}}}: can't contain + or # (MQTT wildcards)")
+                    if v:
+                        clean[k] = v
+                sim.vars[key] = clean
+                log(f"topic variables for {sim.sel['profile']['name']}: " + (", ".join(f"{{{k}}}={v}" for k, v in clean.items()) or "(cleared)"))
+                sim.save_state()
+                sim.restart()
             elif path == "/api/upload":
                 kind = b.get("kind")
                 if kind not in KINDS:
@@ -684,7 +762,8 @@ def main():
     ap.add_argument("--client-id", default=env("MQTT_CLIENT_ID", "mqtt-sim"))
     ap.add_argument("--profile", default=env("PROFILE", "profiles/van-victron.csv"))
     ap.add_argument("--route", default=env("ROUTE", ""))
-    ap.add_argument("--portal", default=env("PORTAL", "000000000000"))
+    ap.add_argument("--portal", default=env("PORTAL", ""),
+                    help="default value for {portal} (Victron portal ID); can be changed on the web page")
     ap.add_argument("--speedup", type=float, default=float(env("SPEEDUP", "1")),
                     help="route time multiplier (1 = real time)")
     ap.add_argument("--loop", action="store_true", default=truthy(env("ROUTE_LOOP"), False))
@@ -714,7 +793,7 @@ def main():
     if a.clear_only:
         p = sim.sel_path("profile")
         sim.connect()
-        sim.clear(load_profile_checked(p, a.portal, a.every))
+        sim.clear(load_profile_checked(p, sim.variables(), a.every))
         sim.shutdown()
         return
 
