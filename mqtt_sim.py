@@ -23,7 +23,8 @@ Profile columns (header row required, extra columns are ignored):
   every_s   seconds between publishes (default 5)
   decimals  rounding for numbers (default 1)
   retain    yes/no
-  notes     free text
+  notes     what the topic is (shown as Description on the web page); a column called
+            "description" works too
 """
 import argparse
 import csv
@@ -43,7 +44,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib
 import paho.mqtt.client as mqtt  # noqa: E402  (vendored in ./lib)
 
 EARTH_R = 6371000.0
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("DATA_DIR") or "/data"
 
@@ -188,6 +189,7 @@ class Row:
         self.format = (d.get("format") or "number").strip().lower()
         self.mode = (d.get("mode") or "constant").strip().lower()
         self.value = fill((d.get("value") or "").strip(), variables)
+        self.notes = (d.get("description") or d.get("notes") or "").strip()
         self.min = fnum(d.get("min"), 0.0)
         self.max = fnum(d.get("max"), self.min if fnum(d.get("min")) is not None else 100.0)
         self.step = fnum(d.get("step"), (self.max - self.min) / 20 or 1)
@@ -544,7 +546,7 @@ class Sim:
                     payload = r.make(t, rs)
                     if payload is not None:
                         self.publish(r.topic, payload, r.retain)
-                        self.values[r.topic] = [payload if isinstance(payload, str) else payload.decode(), time.time()]
+                        self.values[r.topic] = [payload if isinstance(payload, str) else payload.decode(), time.time(), r.notes]
                     r.next_due = now + r.every
             if rs and now - last_status >= 60:
                 log(f"gps {rs['phase']} {rs['coords']} {rs['speed_kmh']:.0f} km/h {rs['name']}")

@@ -49,6 +49,7 @@
   td.topic { font-family:Consolas,monospace; color:#cfe3f7; word-break:break-all; }
   td.val { font-family:Consolas,monospace; color:var(--orange); word-break:break-all; }
   td.age { color:var(--dim); white-space:nowrap; }
+  td.desc { color:#bcd6ef; }
   .scroll { max-height:420px; overflow:auto; }
   #filter { width:100%; margin-bottom:8px; background:#0a2242; color:var(--text); border:1px solid var(--line); border-radius:9px; padding:7px 10px; font:inherit; }
   pre { margin:0; font-size:12px; color:#bcd6ef; white-space:pre-wrap; max-height:260px; overflow:auto; }
@@ -131,8 +132,8 @@
 
   <section class="card wide">
     <h2>Live values</h2>
-    <input id="filter" placeholder="Filter topics…">
-    <div class="scroll"><table><thead><tr><th>Topic</th><th>Last value</th><th>Age</th></tr></thead><tbody id="vals"></tbody></table></div>
+    <input id="filter" placeholder="Filter by topic or description…">
+    <div class="scroll"><table><thead><tr><th>Topic</th><th>Description</th><th>Last value</th><th>Age</th></tr></thead><tbody id="vals"></tbody></table></div>
   </section>
 
   <section class="card wide">
@@ -236,11 +237,11 @@ $('bVars').onclick = async () => {
 async function refreshValues() {
   try {
     const v = await api('/api/values'), f = $('filter').value.toLowerCase();
-    const rows = Object.entries(v.values).filter(([t]) => !f || t.toLowerCase().includes(f)).sort((a, b) => a[0].localeCompare(b[0]));
-    $('vals').innerHTML = rows.map(([t, [val, ts]]) => {
+    const rows = Object.entries(v.values).filter(([t, x]) => !f || t.toLowerCase().includes(f) || String(x[2] || '').toLowerCase().includes(f)).sort((a, b) => a[0].localeCompare(b[0]));
+    $('vals').innerHTML = rows.map(([t, [val, ts, desc]]) => {
       const age = Math.max(0, Math.round(v.now - ts));
-      return `<tr><td class="topic">${esc(t)}</td><td class="val">${esc(val)}</td><td class="age">${age < 60 ? age + ' s' : Math.round(age / 60) + ' min'}</td></tr>`;
-    }).join('') || '<tr><td colspan="3" class="muted">Nothing published yet.</td></tr>';
+      return `<tr><td class="topic">${esc(t)}</td><td class="desc">${esc(desc || '')}</td><td class="val">${esc(val)}</td><td class="age">${age < 60 ? age + ' s' : Math.round(age / 60) + ' min'}</td></tr>`;
+    }).join('') || '<tr><td colspan="4" class="muted">Nothing published yet.</td></tr>';
   } catch (e) { /* shown by status */ }
 }
 async function refreshLog() {

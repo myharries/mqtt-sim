@@ -16,7 +16,7 @@ Open `http://<unraid-ip>:8099` (on Unraid: Docker → mqtt-sim icon → **WebUI*
 - **Profile** and **GPS route**: choose from **My files** (your uploads) or **Examples** (built in). **Use a CSV from this PC…** uploads a file into the data folder and switches to it straight away. **Download** gets the current file (start from an example, edit it in Excel, upload it back). **Delete** removes one of your own files.
 - **Speed-up** and **Repeat route** for the GPS drive.
 - **Topic variables**: every `{placeholder}` the profile uses (e.g. `{portal}` for the Victron portal ID), each with a box. Values are saved per profile. Topics whose placeholders are still empty are not published, and the page says so.
-- **Live values**: every topic with its last value and age, with a filter box.
+- **Live values**: every topic with its description (the profile's `notes` column), last value and age, with a filter box.
 - **Log**: the last few hundred log lines.
 
 Your choices are remembered in `data/mqtt-sim.json`, so the simulator comes back the same way after a restart or an update (including staying stopped if you stopped it). `PROFILE` and `ROUTE` in the container settings are only used the very first time.
@@ -119,7 +119,7 @@ Edit in Excel. Header row required; extra columns are ignored. Rows with `enable
 | `every_s` | seconds between publishes |
 | `decimals` | rounding (0 = whole numbers) |
 | `retain` | yes / no |
-| `notes` | anything |
+| `notes` | what the topic is: shown as **Description** on the web page (a column named `description` works too) |
 
 Each row is independent: `victron/info/battery_soc` and `N/.../Dc/Battery/Soc` wander separately, so they won't match each other.
 
