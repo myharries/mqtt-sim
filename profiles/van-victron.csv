@@ -1,0 +1,74 @@
+enabled,topic,format,mode,value,min,max,step,period_s,every_s,decimals,retain,notes
+yes,victron/info/battery_soc,number,drift,85,20,100,0.3,,10,1,yes,House battery SoC %
+yes,victron/info/battery_voltage,number,drift,26.8,25.6,28.8,0.05,,5,2,yes,House battery V (24 V system)
+yes,victron/info/battery_current,number,drift,5,-40,30,2,,5,1,yes,+ charging / - discharging
+yes,victron/info/solar_power,number,sine,,0,1200,,1800,10,0,yes,"Roof solar W, 60 s avg in Node-RED"
+yes,victron/info/mppt_yield_today,number,drift,2.5,0,6,0.01,,30,2,yes,kWh today
+yes,victron/info/mppt_max_power_today,number,constant,1150,,,,,60,0,yes,W
+yes,victron/info/mppt_battery_current,number,sine,,0,40,,1800,10,1,yes,A
+yes,victron/info/mppt_pv_voltage,number,drift,90,60,110,1,,10,1,yes,V
+yes,victron/info/mppt_device_state,number,list,3|4|5,,,,,120,0,yes,"3 Bulk, 4 Absorption, 5 Float"
+yes,victron/info/bat-temp,number,drift,24,18,32,0.2,,30,1,yes,Battery temp °C
+yes,victron/info/ac_power,number,drift,150,0,800,40,,5,0,yes,Inverter AC out W
+yes,victron/info/ac_current,number,drift,0.7,0,4,0.2,,5,1,yes,Inverter AC out A
+yes,victron/info/shore_power_watts,number,constant,0,,,,,10,0,yes,0 = not on shore power
+yes,victron/info/mains_voltage,number,constant,0,,,,,10,0,yes,Shore V (0 = disconnected)
+yes,victron/info/mains_battery_current,number,drift,0,0,4,0.2,,10,1,yes,Node-RED currently sends inverter output A here (bug)
+yes,victron/info/mains_device_state,number,list,1|2|3,,,,,120,0,yes,VE.Bus charge state
+yes,victron/info/dc_power,number,drift,120,-300,600,30,,5,0,yes,DC system W (10 s avg)
+yes,victron/info/dc-current,number,drift,4.5,-10,25,1,,5,2,yes,DC system A
+yes,victron/info/engine_on,bool,list,false|false|false|true,,,,,60,,yes,Really: battery > 29 V
+no,victron/info/Shore Power OnOff,json,constant,"{""method"":""Switch.Set"",""parameters"":{""id"":0,""on"":true}}",,,,,60,,yes,"Leftover, publishes a Shelly command"
+yes,victron/info/altitude,number,route,altitude,,,,,5,0,yes,"m, from route"
+yes,victron/info/course_deg,number,route,course,,,,,5,0,yes,"deg, from route"
+yes,victron/info/gps-coords,text,route,coords,,,,,5,,yes,"'lat,lon' 3 dp"
+no,victron/info/latitude,number,route,lat,,,,,5,3,yes,Out node disabled in Node-RED
+no,victron/info/longitude,number,route,lon,,,,,5,3,yes,Out node disabled in Node-RED
+yes,victron/info/OutsideTemp,number,drift,24,18,30,0.2,,60,3,yes,Actually predicted INSIDE temp in 30 min
+yes,victron/info/van-temp,number,drift,23,18,30,0.2,,60,1,yes,Wall Display °C
+yes,victron/info/van-humidity,number,drift,55,40,80,1,,60,1,yes,Wall Display %
+yes,victron/info/van-illuminance,number,drift,300,0,800,40,,60,0,yes,Wall Display lux
+no,victron/info/van-illumination,text,list,dark|twilight|bright,,,,,60,,yes,HWS tab copy only
+yes,truck/cmnd/night_mode,bool,constant,false,,,,,60,,yes,Night = dusk to sunrise
+yes,truck/cmnd/day_or_night,bool,constant,false,,,,,60,,yes,Duplicate of night_mode
+no,vancab/button/dump-valve,bool,constant,true,,,,,60,,no,COMMAND: opens the dump valve for 45 s. Keep off
+no,shellies/+/BLE-HT-7F/sensor/temperature,number,drift,22,10,35,0.3,,60,1,no,"Disabled leftover (wildcard topic, not publishable)"
+no,shellies/+/BLE-HT-7F/sensor/humidity,number,drift,60,30,90,1,,60,1,no,Disabled leftover
+yes,N/{portal}/system/0/Dc/Battery/Soc,victron,drift,85,20,100,0.3,,10,1,yes,
+yes,N/{portal}/system/0/Dc/Battery/Voltage,victron,drift,26.8,25.6,28.8,0.05,,5,2,yes,
+yes,N/{portal}/system/0/Dc/Battery/Current,victron,drift,5,-40,30,2,,5,1,yes,
+yes,N/{portal}/system/0/Dc/Pv/Power,victron,sine,,0,1500,,1800,10,0,yes,Both chargers
+yes,N/{portal}/system/0/Dc/System/Power,victron,drift,120,-300,600,30,,5,0,yes,"Raw, not averaged"
+yes,N/{portal}/solarcharger/277/History/Daily/0/Yield,victron,drift,0.6,0,2,0.01,,30,2,yes,Solar blankets kWh
+yes,N/{portal}/solarcharger/278/History/Daily/0/Yield,victron,drift,2.5,0,6,0.01,,30,2,yes,Roof kWh
+yes,N/{portal}/solarcharger/277/History/Daily/0/MaxPower,victron,constant,300,,,,,60,0,yes,
+yes,N/{portal}/solarcharger/278/History/Daily/0/MaxPower,victron,constant,1150,,,,,60,0,yes,
+yes,N/{portal}/solarcharger/277/Dc/0/Current,victron,sine,,0,10,,1800,10,1,yes,
+yes,N/{portal}/solarcharger/278/Dc/0/Current,victron,sine,,0,40,,1800,10,1,yes,
+yes,N/{portal}/solarcharger/278/Yield/Power,victron,sine,,0,1200,,1800,10,0,yes,Roof solar W
+yes,N/{portal}/solarcharger/277/Yield/Power,victron,sine,,0,300,,1800,10,0,yes,Solar blankets W
+yes,N/{portal}/solarcharger/278/Pv/V,victron,drift,90,60,110,1,,10,1,yes,
+yes,N/{portal}/solarcharger/278/State,victron,list,3|4|5,,,,,120,0,yes,"3 Bulk, 4 Absorption, 5 Float"
+yes,N/{portal}/temperature/24/Temperature,victron,drift,24,18,32,0.2,,30,1,yes,Battery temp
+yes,N/{portal}/vebus/276/Ac/Out/L1/P,victron,drift,150,0,800,40,,5,0,yes,
+yes,N/{portal}/vebus/276/Ac/Out/L1/I,victron,drift,0.7,0,4,0.2,,5,1,yes,
+yes,N/{portal}/vebus/276/Ac/ActiveIn/L1/P,victron,constant,0,,,,,10,0,yes,Shore W
+yes,N/{portal}/vebus/276/Ac/ActiveIn/L1/V,victron,constant,0,,,,,10,0,yes,Shore V
+yes,N/{portal}/vebus/276/Dc/0/Current,victron,drift,-5,-30,30,2,,10,1,yes,MultiPlus DC A
+yes,N/{portal}/vebus/276/State,victron,list,9|9|3|4,,,,,120,0,yes,"9 Inverting, 3 Bulk, 4 Absorption"
+yes,N/{portal}/gps/0/Position/Latitude,victron,route,lat,,,,,2,6,yes,
+yes,N/{portal}/gps/0/Position/Longitude,victron,route,lon,,,,,2,6,yes,
+yes,N/{portal}/gps/0/Speed,victron,route,speed_ms,,,,,2,2,yes,"m/s, like the Cerbo"
+yes,N/{portal}/gps/0/Fix,victron,route,fix,,,,,5,0,yes,1 = fix
+yes,N/{portal}/gps/0/Altitude,victron,route,altitude,,,,,5,0,yes,
+yes,N/{portal}/gps/0/Course,victron,route,course,,,,,5,0,yes,
+yes,N/{portal}/tank/24/Level,victron,drift,80,5,100,0.4,,30,0,yes,Front tank %
+yes,N/{portal}/tank/24/Remaining,victron,drift,0.12,0.005,0.15,0.001,,30,3,yes,Front tank m3 (150 L tank assumed; not linked to %)
+yes,N/{portal}/tank/27/Level,victron,drift,55,5,100,0.4,,30,0,yes,Middle tank %
+yes,N/{portal}/tank/27/Remaining,victron,drift,0.083,0.005,0.15,0.001,,30,3,yes,Middle tank m3 (150 L tank assumed; not linked to %)
+yes,N/{portal}/tank/26/Level,victron,drift,30,5,100,0.4,,30,0,yes,Rear (drinking) tank %
+yes,N/{portal}/tank/26/Remaining,victron,drift,0.045,0.005,0.15,0.001,,30,3,yes,Rear (drinking) tank m3 (150 L tank assumed; not linked to %)
+yes,myh-test/outside/temperature,number,drift,26,12,38,0.3,,30,1,yes,Stand-in for outside Shelly BLU H&T
+yes,myh-test/outside/humidity,number,drift,55,20,95,1,,30,0,yes,Stand-in for outside Shelly BLU H&T
+yes,myh-test/cab/temperature,number,drift,28,15,45,0.3,,30,1,yes,Stand-in for cab Shelly BLU H&T
+yes,myh-test/cab/humidity,number,drift,45,20,80,1,,30,0,yes,Stand-in for cab Shelly BLU H&T

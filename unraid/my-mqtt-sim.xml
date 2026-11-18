@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>mqtt-sim</Name>
+  <Repository>ghcr.io/myharries/mqtt-sim:latest</Repository>
+  <Registry>https://github.com/myharries/mqtt-sim/pkgs/container/mqtt-sim</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Icon>https://raw.githubusercontent.com/myharries/mqtt-sim/main/icon.png?v=2</Icon>
+  <Project>https://github.com/myharries/mqtt-sim</Project>
+  <Support>https://github.com/myharries/mqtt-sim/issues</Support>
+  <Overview>myH MQTT simulator: publishes test values from a CSV profile (and an optional GPS route) to an MQTT broker. The van profile and route are built in; put your own profiles and routes in the data folder.</Overview>
+  <Category>Tools:</Category>
+  <Config Name="Data folder" Target="/data" Default="/mnt/user/appdata/mqtt-sim/data" Mode="rw" Description="Your own profiles/ and routes/ (used before the built-in ones). examples/ is refreshed with the built-in files on every start." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/mqtt-sim/data</Config>
+  <Config Name="Broker host" Target="MQTT_HOST" Default="192.168.10.240" Mode="" Description="MQTT broker address (Van Home Assistant)" Type="Variable" Display="always" Required="true" Mask="false">192.168.10.240</Config>
+  <Config Name="Broker port" Target="MQTT_PORT" Default="1883" Mode="" Description="" Type="Variable" Display="always" Required="true" Mask="false">1883</Config>
+  <Config Name="Broker user" Target="MQTT_USER" Default="mqtt-sim" Mode="" Description="HA user created for the simulator" Type="Variable" Display="always" Required="false" Mask="false">mqtt-sim</Config>
+  <Config Name="Broker password" Target="MQTT_PASS" Default="" Mode="" Description="Password of the mqtt-sim HA user" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Profile" Target="PROFILE" Default="profiles/van-victron.csv" Mode="" Description="Topic profile CSV: looked for in the data folder first, then the built-in files" Type="Variable" Display="always" Required="true" Mask="false">profiles/van-victron.csv</Config>
+  <Config Name="Route" Target="ROUTE" Default="routes/demo-wollongong-kiama.csv" Mode="" Description="GPS waypoints CSV (blank = no GPS)" Type="Variable" Display="always" Required="false" Mask="false">routes/demo-wollongong-kiama.csv</Config>
+  <Config Name="Route speed-up" Target="SPEEDUP" Default="1" Mode="" Description="1 = real time, 10 = ten times faster" Type="Variable" Display="always" Required="false" Mask="false">1</Config>
+  <Config Name="Repeat route" Target="ROUTE_LOOP" Default="no" Mode="" Description="yes = start the route again when it ends" Type="Variable" Display="always" Required="false" Mask="false">no</Config>
+  <Config Name="Victron portal ID" Target="PORTAL" Default="" Mode="" Description="Your Victron portal ID (VRM → Settings → General); replaces {portal} in topics" Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Clear on stop" Target="CLEAR_ON_EXIT" Default="yes" Mode="" Description="Remove retained test values when the container stops" Type="Variable" Display="advanced" Required="false" Mask="false">yes</Config>
+  <Config Name="Verbose" Target="VERBOSE" Default="no" Mode="" Description="Log every message" Type="Variable" Display="advanced" Required="false" Mask="false">no</Config>
+</Container>
