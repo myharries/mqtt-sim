@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MQTT Simulator</title>
+<link rel="icon" href="icon.png">
+<style>
+  :root { --bg:#071a33; --card:#0d2a4f; --card2:#103460; --line:#1f4f86; --text:#e8f2ff; --dim:#8fb2d6;
+          --blue:#2a8fe0; --light:#7fd4ff; --orange:#ffb02e; --green:#3ccf7a; --red:#ff6b5b; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:radial-gradient(circle at 30% 0%,#0f3d73,var(--bg) 60%); color:var(--text);
+         font:15px/1.45 "Segoe UI",Roboto,system-ui,sans-serif; min-height:100vh; }
+  header { display:flex; align-items:center; gap:16px; padding:18px 24px; }
+  header img { width:64px; height:64px; }
+  header h1 { margin:0; font-size:24px; letter-spacing:.02em; }
+  header .sub { color:var(--dim); font-size:13px; }
+  header .ver { margin-left:auto; color:var(--dim); font-size:12px; }
+  main { max-width:1200px; margin:0 auto; padding:0 24px 40px; display:grid; gap:16px;
+         grid-template-columns:repeat(2,minmax(0,1fr)); }
+  @media (max-width:760px) { main { grid-template-columns:1fr; } }
+  .card { background:linear-gradient(160deg,var(--card2),var(--card)); border:1px solid var(--line);
+          border-radius:14px; padding:16px 18px; }
+  .card h2 { margin:0 0 12px; font-size:13px; letter-spacing:.12em; color:var(--light); text-transform:uppercase; }
+  .wide { grid-column:1 / -1; }
+  .status { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .dot { width:14px; height:14px; border-radius:50%; background:#5b6b7c; flex:0 0 14px; }
+  .dot.on { background:var(--green); box-shadow:0 0 0 4px rgba(60,207,122,.2); }
+  .dot.err { background:var(--red); }
+  .big { font-size:20px; font-weight:700; }
+  .muted { color:var(--dim); font-size:13px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+  button, .btn { background:#164a84; color:var(--text); border:1px solid #2a6cb5; border-radius:9px;
+         padding:8px 14px; font:inherit; font-size:14px; cursor:pointer; text-decoration:none; display:inline-block; }
+  button:hover, .btn:hover { background:#1c5aa0; }
+  button.pri { background:var(--blue); border-color:var(--light); }
+  button.warn { background:#5a2430; border-color:#a0444f; }
+  button:disabled { opacity:.4; cursor:default; }
+  select, input[type=number] { background:#0a2242; color:var(--text); border:1px solid var(--line);
+         border-radius:9px; padding:8px 10px; font:inherit; font-size:14px; }
+  select { min-width:240px; flex:1; }
+  label.chk { display:flex; gap:6px; align-items:center; color:var(--dim); font-size:14px; }
+  .err { color:var(--red); }
+  .tag { display:inline-block; font-size:11px; padding:1px 7px; border-radius:8px; background:#1d3f6a; color:var(--light); margin-left:6px; }
+  .tag.ex { background:#4a3a12; color:var(--orange); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:5px 8px; border-bottom:1px solid #16375f; vertical-align:top; }
+  th { color:var(--dim); font-weight:600; position:sticky; top:0; background:var(--card); }
+  td.topic { font-family:Consolas,monospace; color:#cfe3f7; word-break:break-all; }
+  td.val { font-family:Consolas,monospace; color:var(--orange); word-break:break-all; }
+  td.age { color:var(--dim); white-space:nowrap; }
+  .scroll { max-height:420px; overflow:auto; }
+  #filter { width:100%; margin-bottom:8px; background:#0a2242; color:var(--text); border:1px solid var(--line); border-radius:9px; padding:7px 10px; font:inherit; }
+  pre { margin:0; font-size:12px; color:#bcd6ef; white-space:pre-wrap; max-height:260px; overflow:auto; }
+  .note { font-size:12px; color:var(--dim); margin-top:8px; }
+  #toast { position:fixed; right:20px; bottom:20px; background:#123a68; border:1px solid var(--light); border-radius:10px;
+           padding:10px 14px; display:none; max-width:420px; }
+  #toast.err { border-color:var(--red); }
+  input[type=file] { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <img src="icon.png" alt="">
+  <div><h1>MQTT Simulator</h1><div class="sub">Publishes test values from a CSV profile (and an optional GPS route)</div></div>
+  <div class="ver" id="ver"></div>
+</header>
+<main>
+  <section class="card wide">
+    <h2>Status</h2>
+    <div class="status">
+      <span class="dot" id="runDot"></span><span class="big" id="runTxt">…</span>
+      <span class="muted" id="runInfo"></span>
+    </div>
+    <div class="status" style="margin-top:8px">
+      <span class="dot" id="mqDot"></span><span id="mqTxt">Broker</span>
+    </div>
+    <div class="err" id="errTxt"></div>
+    <div class="row">
+      <button class="pri" id="bStart">▶ Start</button>
+      <button id="bStop">■ Stop</button>
+      <button id="bRestart">↻ Restart</button>
+    </div>
+    <div class="note">Stopping removes the retained test values from the broker. The broker address and login are set in the container settings.</div>
+  </section>
+
+  <section class="card">
+    <h2>Profile (topics)</h2>
+    <div class="row" style="margin-top:0">
+      <select id="selProfile"></select>
+    </div>
+    <div class="row">
+      <button id="upProfile">⬆ Use a CSV from this PC…</button>
+      <a class="btn" id="dlProfile">⬇ Download</a>
+      <button class="warn" id="delProfile">Delete</button>
+      <input type="file" id="fileProfile" accept=".csv,text/csv">
+    </div>
+    <div class="note">Files you upload are saved in the container's data folder and listed under <b>My files</b>. <b>Examples</b> come with the simulator: download one as a starting point, edit it in Excel, then upload it.</div>
+  </section>
+
+  <section class="card">
+    <h2>GPS route</h2>
+    <div class="row" style="margin-top:0">
+      <select id="selRoute"></select>
+    </div>
+    <div class="row">
+      <button id="upRoute">⬆ Use a CSV from this PC…</button>
+      <a class="btn" id="dlRoute">⬇ Download</a>
+      <button class="warn" id="delRoute">Delete</button>
+      <input type="file" id="fileRoute" accept=".csv,text/csv">
+    </div>
+    <div class="row">
+      <label class="chk">Speed-up ×<input type="number" id="speedup" min="0.1" max="1000" step="0.5" style="width:80px"></label>
+      <label class="chk"><input type="checkbox" id="loop"> Repeat route</label>
+      <button id="bOpts">Apply</button>
+    </div>
+    <div class="note" id="gps">No route running.</div>
+  </section>
+
+  <section class="card wide">
+    <h2>Live values</h2>
+    <input id="filter" placeholder="Filter topics…">
+    <div class="scroll"><table><thead><tr><th>Topic</th><th>Last value</th><th>Age</th></tr></thead><tbody id="vals"></tbody></table></div>
+  </section>
+
+  <section class="card wide">
+    <h2>Log</h2>
+    <pre id="log"></pre>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+const $ = id => document.getElementById(id);
+let files = { profiles: [], routes: [] }, status = null;
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function toast(msg, err) {
+  const t = $('toast'); t.textContent = msg; t.className = err ? 'err' : ''; t.style.display = 'block';
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', err ? 7000 : 3000);
+}
+async function act(path, body, okMsg) {
+  try { await api(path, body); if (okMsg) toast(okMsg); } catch (e) { toast(e.message, true); }
+  await refresh(true);
+}
+
+function fillSelect(sel, list, cur, allowNone) {
+  const key = c => c ? c.src + '|' + c.name : '';
+  const opt = (v, t) => `<option value="${v}">${t}</option>`;
+  const mine = list.filter(f => f.src === 'data'), ex = list.filter(f => f.src === 'example');
+  let h = allowNone ? opt('', '(none: no GPS)') : (cur ? '' : opt('', '(choose a profile)'));
+  if (mine.length) h += '<optgroup label="My files">' + mine.map(f => opt('data|' + f.name, f.name)).join('') + '</optgroup>';
+  if (ex.length) h += '<optgroup label="Examples">' + ex.map(f => opt('example|' + f.name, f.name + ' (example)')).join('') + '</optgroup>';
+  if (document.activeElement !== sel) { sel.innerHTML = h; sel.value = key(cur); }
+}
+function fileLinks(kind, cur, dl, del) {
+  if (cur) { dl.href = `/api/file?src=${cur.src}&kind=${kind}&name=${encodeURIComponent(cur.name)}`; dl.style.display = ''; }
+  else dl.style.display = 'none';
+  del.disabled = !(cur && cur.src === 'data');
+}
+
+async function refresh(full) {
+  try {
+    status = await api('/api/status');
+    if (full) files = await api('/api/files');
+  } catch (e) { $('runTxt').textContent = 'No connection to the simulator'; return; }
+  const s = status;
+  $('ver').textContent = 'v' + s.version;
+  $('runDot').className = 'dot ' + (s.running ? 'on' : (s.error ? 'err' : ''));
+  $('runTxt').textContent = s.running ? 'Running' : 'Stopped';
+  const up = s.uptime, hms = up >= 3600 ? Math.floor(up / 3600) + 'h ' + Math.floor(up % 3600 / 60) + 'm' : Math.floor(up / 60) + 'm ' + (up % 60) + 's';
+  $('runInfo').textContent = s.running ? `${s.topics} topics · ${s.sel.profile ? s.sel.profile.name : ''} · up ${hms}` : '';
+  $('mqDot').className = 'dot ' + (s.connected ? 'on' : (s.running ? 'err' : ''));
+  $('mqTxt').textContent = (s.dry_run ? 'Dry run (not publishing)' : `Broker ${s.broker}` + (s.user ? ` as ${s.user}` : '')) + (s.connected ? ' · connected' : (s.running ? ' · not connected' : ''));
+  $('errTxt').textContent = s.error || '';
+  $('bStart').disabled = s.running; $('bStop').disabled = !s.running;
+  fillSelect($('selProfile'), files.profiles, s.sel.profile, false);
+  fillSelect($('selRoute'), files.routes, s.sel.route, true);
+  fileLinks('profiles', s.sel.profile, $('dlProfile'), $('delProfile'));
+  fileLinks('routes', s.sel.route, $('dlRoute'), $('delRoute'));
+  if (document.activeElement !== $('speedup')) $('speedup').value = s.speedup;
+  $('loop').checked = s.loop;
+  const g = s.gps;
+  $('gps').innerHTML = g ? `<b>${g.phase}</b> · ${g.name} · ${g.speed_kmh.toFixed(0)} km/h · ` +
+      `<a style="color:var(--light)" target="_blank" href="https://www.openstreetmap.org/?mlat=${g.lat}&mlon=${g.lon}#map=13/${g.lat}/${g.lon}">${g.lat.toFixed(4)}, ${g.lon.toFixed(4)}</a>` +
+      (s.route_info ? `<br>${s.route_info}` : '') : 'No route running.';
+}
+
+async function refreshValues() {
+  try {
+    const v = await api('/api/values'), f = $('filter').value.toLowerCase();
+    const rows = Object.entries(v.values).filter(([t]) => !f || t.toLowerCase().includes(f)).sort((a, b) => a[0].localeCompare(b[0]));
+    $('vals').innerHTML = rows.map(([t, [val, ts]]) => {
+      const age = Math.max(0, Math.round(v.now - ts));
+      return `<tr><td class="topic">${esc(t)}</td><td class="val">${esc(val)}</td><td class="age">${age < 60 ? age + ' s' : Math.round(age / 60) + ' min'}</td></tr>`;
+    }).join('') || '<tr><td colspan="3" class="muted">Nothing published yet.</td></tr>';
+  } catch (e) { /* shown by status */ }
+}
+async function refreshLog() {
+  try { const l = await api('/api/log'); const p = $('log'); const end = p.scrollTop + p.clientHeight >= p.scrollHeight - 5;
+        p.textContent = l.lines.join('\n'); if (end) p.scrollTop = p.scrollHeight; } catch (e) {}
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function wireKind(kind, key, sel, up, file, del) {
+  sel.addEventListener('change', () => {
+    const [src, ...rest] = sel.value.split('|');
+    act('/api/select', { key, src, name: rest.join('|') }, 'Switched' + (status && status.running ? ' and restarted' : ''));
+    sel.blur();
+  });
+  up.addEventListener('click', () => file.click());
+  file.addEventListener('change', async () => {
+    const f = file.files[0]; file.value = '';
+    if (!f) return;
+    if (f.size > 2000000) return toast('File too big (2 MB max)', true);
+    const content = await f.text();
+    const exists = files[kind].some(x => x.src === 'data' && x.name.toLowerCase() === f.name.toLowerCase());
+    if (exists && !confirm(`${f.name} is already in My files. Replace it?`)) return;
+    await act('/api/upload', { kind, name: f.name, content, use: true }, `${f.name} uploaded and in use`);
+  });
+  del.addEventListener('click', () => {
+    const cur = status && status.sel[key];
+    if (!cur || cur.src !== 'data') return;
+    if (confirm(`Delete ${cur.name} from My files? This can't be undone.`)) act('/api/delete', { kind, name: cur.name }, 'Deleted');
+  });
+}
+wireKind('profiles', 'profile', $('selProfile'), $('upProfile'), $('fileProfile'), $('delProfile'));
+wireKind('routes', 'route', $('selRoute'), $('upRoute'), $('fileRoute'), $('delRoute'));
+$('bStart').onclick = () => act('/api/start', {}, 'Started');
+$('bStop').onclick = () => act('/api/stop', {}, 'Stopped');
+$('bRestart').onclick = () => act('/api/restart', {}, 'Restarted');
+$('bOpts').onclick = () => act('/api/options', { speedup: parseFloat($('speedup').value) || 1, loop: $('loop').checked }, 'Route options applied');
+$('filter').addEventListener('input', refreshValues);
+
+refresh(true); refreshValues(); refreshLog();
+setInterval(refresh, 2000); setInterval(() => refresh(true), 15000);
+setInterval(refreshValues, 2000); setInterval(refreshLog, 3000);
+</script>
+</body>
+</html>

@@ -2,4 +2,5 @@
 .github
 unraid
 *.md
+icon.svg
 __pycache__

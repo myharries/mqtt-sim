@@ -7,13 +7,15 @@ LABEL org.opencontainers.image.title="mqtt-sim" \
 
 ENV PYTHONUNBUFFERED=1 \
     DATA_DIR=/data \
-    PROFILE=profiles/van-victron.csv
+    PROFILE=profiles/van-victron.csv \
+    WEB_PORT=8099
 
 WORKDIR /app
-COPY mqtt_sim.py ./
+COPY mqtt_sim.py webui.html icon.png ./
 COPY lib/ ./lib/
 COPY profiles/ ./profiles/
 COPY routes/ ./routes/
 
 VOLUME ["/data"]
+EXPOSE 8099
 CMD ["python", "-u", "/app/mqtt_sim.py"]
