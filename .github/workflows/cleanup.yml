@@ -1,0 +1,25 @@
+name: Delete old image versions
+
+# Run by hand (Actions -> Delete old image versions -> Run workflow).
+# Keeps the newest N versions of ghcr.io/myharries/mqtt-sim. One build = 5 versions
+# (the tagged image plus its amd64/arm64 parts and build records), so keep a multiple of 5.
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: "Versions to keep (5 = only the latest build)"
+        default: "5"
+        required: true
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: mqtt-sim
+          package-type: container
+          min-versions-to-keep: ${{ inputs.keep }}
